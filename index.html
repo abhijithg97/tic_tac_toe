@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101820">
+  <title>Tic-Tac-Toe</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #101820;
+      color: #f4f7fb;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --muted: #9cabb9;
+      --panel: #192631;
+      --border: #30424f;
+      --accent: #7be0c3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background: radial-gradient(ellipse at top, #203543 0, #101820 58%);
+    }
+
+    main {
+      width: min(100%, 460px);
+      padding: clamp(20px, 6vw, 36px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: rgb(25 38 49 / 94%);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 30%);
+    }
+
+    header { margin-bottom: 24px; text-align: center; }
+    .eyebrow { margin: 0 0 8px; color: var(--accent); font-size: .75rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(2rem, 8vw, 2.7rem); letter-spacing: -.05em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); }
+
+    .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: .8rem; font-weight: 700; }
+    select, .new-round {
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #111d26;
+      color: #f4f7fb;
+      font: inherit;
+    }
+    select { width: 100%; padding: 0 10px; }
+    select:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    select:disabled { opacity: .55; }
+
+    .status { min-height: 28px; margin: 0 0 14px; color: var(--accent); font-weight: 750; text-align: center; }
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .cell {
+      aspect-ratio: 1;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #111d26;
+      color: #f4f7fb;
+      cursor: pointer;
+      font: inherit;
+      font-size: clamp(2.8rem, 16vw, 4.4rem);
+      font-weight: 800;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .cell:not(:disabled):hover { transform: translateY(-2px); border-color: var(--accent); background: #1c303b; }
+    .cell:disabled { cursor: default; }
+    .cell.x { color: #74b9ff; }
+    .cell.o { color: #ff927e; }
+    .cell.winner { border-color: #f6d66b; background: #443d27; }
+
+    .scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 20px 0; }
+    .score { padding: 12px 6px; border: 1px solid var(--border); border-radius: 12px; text-align: center; }
+    .score span { display: block; color: var(--muted); font-size: .72rem; font-weight: 700; }
+    .score strong { display: block; margin-top: 4px; font-size: 1.3rem; }
+    .new-round { width: 100%; border: 0; background: var(--accent); color: #10231f; cursor: pointer; font-weight: 800; }
+    .new-round:hover { background: #a0f0d9; }
+    .footnote { margin: 14px 0 0; color: var(--muted); font-size: .75rem; text-align: center; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">A little friendly competition</p>
+      <h1>Tic-Tac-Toe</h1>
+      <p class="subtitle">Three in a row wins the round.</p>
+    </header>
+
+    <section class="settings" aria-label="Game settings">
+      <label for="mode">Mode
+        <select id="mode">
+          <option value="computer">Computer</option>
+          <option value="twoPlayers">Two Players</option>
+        </select>
+      </label>
+      <label for="difficulty">Difficulty
+        <select id="difficulty">
+          <option value="Easy">Easy</option>
+          <option value="Medium">Medium</option>
+          <option value="Hard" selected>Hard</option>
+        </select>
+      </label>
+    </section>
+
+    <p id="status" class="status" role="status" aria-live="polite">Your turn (X)</p>
+    <section id="board" class="board" role="group" aria-label="Tic-Tac-Toe board"></section>
+    <section id="scores" class="scores" aria-label="Scoreboard"></section>
+    <button id="newRound" class="new-round" type="button">New Round</button>
+    <p class="footnote">Scores are saved in this browser.</p>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const winningCombinations = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+      ];
+      const emptyScores = () => ({ X: 0, O: 0, draws: 0 });
+      const modeSelect = document.querySelector("#mode");
+      const difficultySelect = document.querySelector("#difficulty");
+      const boardElement = document.querySelector("#board");
+      const statusElement = document.querySelector("#status");
+      const scoresElement = document.querySelector("#scores");
+      const scoreNames = { X: "You (X)", O: "Computer (O)", draws: "Draws" };
+
+      let board = Array(9).fill("");
+      let currentPlayer = "X";
+      let gameOver = false;
+      let scores = loadScores();
+
+      const cells = Array.from({ length: 9 }, (_, index) => {
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "cell";
+        cell.setAttribute("aria-label", `Cell ${index + 1}, empty`);
+        cell.addEventListener("click", () => makeMove(index));
+        boardElement.append(cell);
+        return cell;
+      });
+
+      function loadScores() {
+        try {
+          const saved = JSON.parse(localStorage.getItem("tic-tac-toe-scores") || "null");
+          if (saved && ["X", "O", "draws"].every(
+            (key) => Number.isSafeInteger(saved[key]) && saved[key] >= 0
+          )) {
+            return { X: saved.X, O: saved.O, draws: saved.draws };
+          }
+        } catch (error) {
+          statusElement.textContent = `Saved scores could not be loaded: ${error.message}`;
+        }
+        return emptyScores();
+      }
+
+      function saveScores() {
+        try {
+          localStorage.setItem("tic-tac-toe-scores", JSON.stringify(scores));
+        } catch (error) {
+          statusElement.textContent = `Round finished, but scores could not be saved: ${error.message}`;
+        }
+      }
+
+      function renderScores() {
+        const names = modeSelect.value === "twoPlayers"
+          ? { X: "Player X", O: "Player O", draws: "Draws" }
+          : scoreNames;
+        scoresElement.replaceChildren();
+        for (const key of ["X", "O", "draws"]) {
+          const item = document.createElement("div");
+          item.className = "score";
+          const name = document.createElement("span");
+          name.textContent = names[key];
+          const value = document.createElement("strong");
+          value.textContent = scores[key];
+          item.append(name, value);
+          scoresElement.append(item);
+        }
+      }
+
+      function winnerFor(player) {
+        return winningCombinations.find((line) => line.every((index) => board[index] === player));
+      }
+
+      function paintMove(index, player) {
+        board[index] = player;
+        const cell = cells[index];
+        cell.textContent = player;
+        cell.classList.add(player.toLowerCase());
+        cell.setAttribute("aria-label", `Cell ${index + 1}, ${player}`);
+        cell.disabled = true;
+      }
+
+      function endRound(player, line) {
+        gameOver = true;
+        for (const cell of cells) cell.disabled = true;
+        if (line) {
+          for (const index of line) cells[index].classList.add("winner");
+          scores[player] += 1;
+          const winner = modeSelect.value === "twoPlayers"
+            ? `Player ${player} wins!`
+            : player === "X" ? "You win!" : "The computer wins!";
+          statusElement.textContent = winner;
+        } else {
+          scores.draws += 1;
+          statusElement.textContent = "It's a draw!";
+        }
+        renderScores();
+        saveScores();
+      }
+
+      function makeMove(index) {
+        if (gameOver || board[index] || (modeSelect.value === "computer" && currentPlayer !== "X")) return;
+        const player = currentPlayer;
+        paintMove(index, player);
+        const line = winnerFor(player);
+        if (line) {
+          endRound(player, line);
+          return;
+        }
+        if (board.every(Boolean)) {
+          endRound(null, null);
+          return;
+        }
+
+        currentPlayer = player === "X" ? "O" : "X";
+        if (modeSelect.value === "computer") {
+          statusElement.textContent = "Computer is thinking...";
+          cells.forEach((cell, cellIndex) => { if (!board[cellIndex]) cell.disabled = true; });
+          window.setTimeout(computerMove, 350);
+        } else {
+          statusElement.textContent = `Player ${currentPlayer}'s turn`;
+        }
+      }
+
+      function minimax(player, depth) {
+        if (winnerFor("O")) return 10 - depth;
+        if (winnerFor("X")) return depth - 10;
+        if (board.every(Boolean)) return 0;
+
+        const values = [];
+        for (let index = 0; index < board.length; index += 1) {
+          if (board[index]) continue;
+          board[index] = player;
+          values.push(minimax(player === "O" ? "X" : "O", depth + 1));
+          board[index] = "";
+        }
+        return player === "O" ? Math.max(...values) : Math.min(...values);
+      }
+
+      function chooseComputerMove() {
+        const available = board.flatMap((cell, index) => cell ? [] : [index]);
+        if (difficultySelect.value === "Easy") {
+          return available[Math.floor(Math.random() * available.length)];
+        }
+
+        let bestScore = -Infinity;
+        let bestMoves = [];
+        for (const index of available) {
+          board[index] = "O";
+          const score = minimax("X", 1);
+          board[index] = "";
+          if (score > bestScore) {
+            bestScore = score;
+            bestMoves = [index];
+          } else if (score === bestScore) {
+            bestMoves.push(index);
+          }
+        }
+        if (difficultySelect.value === "Medium" && Math.random() < 0.5) {
+          return available[Math.floor(Math.random() * available.length)];
+        }
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+      }
+
+      function computerMove() {
+        if (gameOver || modeSelect.value !== "computer") return;
+        const index = chooseComputerMove();
+        paintMove(index, "O");
+        const line = winnerFor("O");
+        if (line) {
+          endRound("O", line);
+          return;
+        }
+        if (board.every(Boolean)) {
+          endRound(null, null);
+          return;
+        }
+        currentPlayer = "X";
+        statusElement.textContent = "Your turn (X)";
+        cells.forEach((cell, cellIndex) => { if (!board[cellIndex]) cell.disabled = false; });
+      }
+
+      function restartGame() {
+        board = Array(9).fill("");
+        currentPlayer = "X";
+        gameOver = false;
+        cells.forEach((cell, index) => {
+          cell.textContent = "";
+          cell.className = "cell";
+          cell.disabled = false;
+          cell.setAttribute("aria-label", `Cell ${index + 1}, empty`);
+        });
+        statusElement.textContent = "Your turn (X)";
+      }
+
+      modeSelect.addEventListener("change", () => {
+        difficultySelect.disabled = modeSelect.value === "twoPlayers";
+        renderScores();
+        restartGame();
+      });
+      difficultySelect.addEventListener("change", restartGame);
+      document.querySelector("#newRound").addEventListener("click", restartGame);
+      renderScores();
+    })();
+  </script>
+</body>
+</html>
