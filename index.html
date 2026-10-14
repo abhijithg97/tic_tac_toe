@@ -119,7 +119,7 @@
     <section id="board" class="board" role="group" aria-label="Tic-Tac-Toe board"></section>
     <section id="scores" class="scores" aria-label="Scoreboard"></section>
     <button id="newRound" class="new-round" type="button">New Round</button>
-    <p class="footnote">Scores are saved in this browser.</p>
+    <p class="footnote">Scores reset to zero when you leave the game.</p>
   </main>
 
   <script>
@@ -326,6 +326,11 @@
       });
       difficultySelect.addEventListener("change", restartGame);
       document.querySelector("#newRound").addEventListener("click", restartGame);
+      window.addEventListener("pagehide", () => {
+        scores = emptyScores();
+        renderScores();
+        saveScores();
+      });
       renderScores();
     })();
   </script>

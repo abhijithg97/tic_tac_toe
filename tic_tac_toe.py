@@ -17,6 +17,7 @@ class TicTacToe:
         self.root = root
         self.root.title("Tic-Tac-Toe vs Computer")
         self.root.configure(bg="#f0f0f0")
+        self.root.protocol("WM_DELETE_WINDOW", self.close_game)
 
         self.current_player = "X"
         self.board = [""] * 9
@@ -327,6 +328,11 @@ class TicTacToe:
             button.config(text="", state="normal", bg="#ffffff", fg="#222222")
 
         self.status.config(text=self._turn_message())
+
+    def close_game(self):
+        self.scores = {"X": 0, "O": 0, "draws": 0}
+        self._save_scores()
+        self.root.destroy()
 
 
 if __name__ == "__main__":
